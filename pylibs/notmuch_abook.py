@@ -29,6 +29,37 @@ import sys
 import re
 
 
+class Printer(object):
+    def __init__(self, quiet, verbose, debug):
+        if quiet and (verbose or debug):
+            raise Exception('Cannot combine --quiet with either --verbose or --debug')
+        self.quiet = quiet
+        self.verbose = verbose or debug
+        self.debug = debug
+
+    def error(self, msg):
+        print >> sys.stderr, msg
+
+    def exception(self, exc):
+        if self.verbose:
+            import traceback
+            traceback.print_exc()
+        else:
+            self.error(exc)
+
+    def normal(self, msg):
+        if not self.quiet:
+            print msg
+
+    def verbose(self, msg):
+        if self.verbose:
+            print msg
+
+    def debug(self, msg):
+        if self.debug:
+            print msg
+
+
 class NotMuchConfig(object):
     def __init__(self, nm_path):
         self.path = os.path.expanduser(nm_path)
@@ -161,10 +192,18 @@ class SQLiteStorage():
 
 def run():
     parser = argparse.ArgumentParser(prog=sys.argv[0], description="""Notmuch Addressbook utility""")
+    parser.add_argument("-q", "--quiet",
+                        dest="quiet",
+                        action="store_true",
+                        help="Only show errors (not valid with lookup)")
     parser.add_argument("-v", "--verbose",
                         dest="verbose",
                         action="store_true",
                         help="Show full stacktraces on error")
+    parser.add_argument("-v", "--debug",
+                        dest="debug",
+                        action="store_true",
+                        help="Show lots of output")
     parser.add_argument("-c", "--config",
                         dest="config",
                         action="store",
@@ -181,29 +220,31 @@ def run():
                             help="Output addresses in the class abook format.")
     lookup_cmd.add_argument(dest="match", help="Match string to be looked up.")
 
-    def create_act(args, db, cf):
+    def create_act(args, printer, db, cf):
         db.create()
         nm_mailgetter = NotmuchAddressGetter(cf)
         n = db.init(nm_mailgetter.generate)
-        print "added %d addresses" % n
+        printer.normal("added %d addresses" % n)
 
-    def update_act(args, db, cf):
+    def update_act(args, printer, db, cf):
         n = 0
         m = email.message_from_file(sys.stdin)
         for addr in MailParser().parse_mail(m):
             if db.update(addr):
                 n += 1
-        print "added %d addresses" % n
+        printer.normal("added %d addresses" % n)
 
-    def lookup_act(args, db, cf):
+    def lookup_act(args, printer, db, cf):
+        if printer.quiet:
+            raise Exception('Cannot use --quiet with lookup')
         for addr in db.lookup(args.match):
             if args.abook_output:
-                print(addr[1] + "\t" + addr[0])
+                printer.normal(addr[1] + "\t" + addr[0])
             else:
                 if addr[0] != "":
-                    print(addr[0]+" <"+addr[1]+">")
+                    printer.normal(addr[0]+" <"+addr[1]+">")
                 else:
-                    print(addr[1])
+                    printer.normal(addr[1])
 
     create_cmd.set_defaults(func=create_act)
     update_cmd.set_defaults(func=update_act)
@@ -211,19 +252,16 @@ def run():
 
     args = parser.parse_args()
     try:
+        printer = Printer(args.quiet, args.verbose, args.debug)
         cf = NotMuchConfig(os.path.expanduser(args.config))
         if cf.get("addressbook", "backend") == "sqlite3":
             db = SQLiteStorage(cf)
         else:
-            print "Database backend '%s' is not implemented." % cf.get("addressbook", "backend")
-        args.func(args, db, cf)
+            printer.error("Database backend '%s' is not implemented." %
+                          cf.get("addressbook", "backend"))
+        args.func(args, printer, db, cf)
     except Exception as exc:
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
-        else:
-            print exc
+        printer.exception(exc)
 
 if __name__ == '__main__':
     run()
-
