@@ -71,8 +71,9 @@ class NotMuchConfig(object):
 
 
 class MailParser(object):
-    def __init__(self):
+    def __init__(self, printer):
         self.addresses = dict()
+        self.printer = printer
 
     def parse_mail(self, m):
         """
@@ -100,11 +101,11 @@ class NotmuchAddressGetter(object):
     the user's $HOME/.notmuch-config file.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, printer):
         """
         """
         self.db_path = config.get("database", "path")
-        self._mp = MailParser()
+        self._mp = MailParser(printer)
 
     def _get_all_messages(self):
         notmuch_db = notmuch.Database(self.db_path)
@@ -120,8 +121,9 @@ class NotmuchAddressGetter(object):
 
 class SQLiteStorage():
     """SQL Storage backend"""
-    def __init__(self, config):
+    def __init__(self, config, printer):
         self.__path = config.get("addressbook", "path")
+        self.printer = printer
 
     def connect(self):
         """
@@ -222,14 +224,14 @@ def run():
 
     def create_act(args, printer, db, cf):
         db.create()
-        nm_mailgetter = NotmuchAddressGetter(cf)
+        nm_mailgetter = NotmuchAddressGetter(cf, printer)
         n = db.init(nm_mailgetter.generate)
         printer.normal("added %d addresses" % n)
 
     def update_act(args, printer, db, cf):
         n = 0
         m = email.message_from_file(sys.stdin)
-        for addr in MailParser().parse_mail(m):
+        for addr in MailParser(printer).parse_mail(m):
             if db.update(addr):
                 n += 1
         printer.normal("added %d addresses" % n)
@@ -255,7 +257,7 @@ def run():
         printer = Printer(args.quiet, args.verbose, args.debug)
         cf = NotMuchConfig(os.path.expanduser(args.config))
         if cf.get("addressbook", "backend") == "sqlite3":
-            db = SQLiteStorage(cf)
+            db = SQLiteStorage(cf, printer)
         else:
             printer.error("Database backend '%s' is not implemented." %
                           cf.get("addressbook", "backend"))
