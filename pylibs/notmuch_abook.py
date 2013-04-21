@@ -204,7 +204,7 @@ def run():
                         dest="verbose",
                         action="store_true",
                         help="Show full stacktraces on error")
-    parser.add_argument("-v", "--debug",
+    parser.add_argument("-d", "--debug",
                         dest="debug",
                         action="store_true",
                         help="Show lots of output")
