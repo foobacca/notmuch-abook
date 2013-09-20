@@ -1,0 +1,8 @@
+[database]
+path = testmailroot
+
+
+[addressbook]
+backend = sqlite
+path = testdb.sqlite
+ignorefile = testignore
