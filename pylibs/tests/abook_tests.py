@@ -33,19 +33,32 @@ class TestNotmuchConfig(unittest.TestCase):
         self.assertIsNone(config.get('addressbook', 'ignorefile'))
 
 
-class TestAbookDatabase(unittest.TestCase):
+class TestAbookDatabaseNoIgnore(unittest.TestCase):
 
     def setUp(self):
-        self.config = abook.NotMuchConfig(test_config)
+        self.config = abook.NotMuchConfig(test_config_noignore)
         self.db = abook.SQLiteStorage(self.config)
 
     def tearDown(self):
         if path.exists(testdb):
             os.remove(testdb)
 
+    def assertNumEntries(self, expected_count):
+        with self.db.connect() as c:
+            rows = c.execute('select count(*) from AddressBook')
+            result = rows.fetchall()
+            actual_count = result[0][0]
+            self.assertEqual(expected_count, actual_count)
+
     def createFakeDb(self):
         with open(testdb, 'w') as f:
             f.write('nonsense')
+
+    def do_update_a(self):
+        self.db.update(('a', 'a@a.com'))
+
+    def do_update_b(self):
+        self.db.update(('b', 'b@b.com'))
 
     def test_path_set_correctly(self):
         self.assertEqual(testdb, self.db._SQLiteStorage__path)
@@ -59,3 +72,28 @@ class TestAbookDatabase(unittest.TestCase):
     def test_create_raises_IOError_when_db_is_present(self):
         self.createFakeDb()
         self.assertRaises(IOError, self.db.create)
+
+    def test_connect_works_after_create_is_run(self):
+        try:
+            self.db.create()
+            self.db.connect()
+        except Exception as e:
+            self.fail('Unexpected exception %s' % e)
+
+    def test_can_add_name_address_to_empty_db(self):
+        self.db.create()
+        # assert the database is empty
+        self.assertNumEntries(0)
+        self.do_update_a()
+        self.assertNumEntries(1)
+        self.do_update_b()
+        self.assertNumEntries(2)
+
+    def test_duplicate_name_does_not_get_added(self):
+        self.db.create()
+        # assert the database is empty
+        self.assertNumEntries(0)
+        self.do_update_a()
+        self.assertNumEntries(1)
+        self.do_update_a()
+        self.assertNumEntries(1)
