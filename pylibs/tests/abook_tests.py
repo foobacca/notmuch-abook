@@ -1,6 +1,7 @@
 import os
 from os import path
 import sys
+import docopt
 import unittest
 
 abook_dir = path.join(path.dirname(__file__), os.pardir)
@@ -97,3 +98,12 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         self.assertNumEntries(1)
         self.do_update_a()
         self.assertNumEntries(1)
+
+
+class TestDocOpt(unittest.TestCase):
+
+    def test_docopt_parses_doc_string(self):
+        # if the docopt string is badly formatted, we'll get an exception
+        # thrown here
+        options = docopt.docopt(abook.__doc__, argv=['--help'], help=False)
+        self.assertTrue(options['--help'])
