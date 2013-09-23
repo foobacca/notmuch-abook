@@ -227,9 +227,19 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         self.db.change_name(self.a_address, 'a2')
         self.assertNameEquals(self.a_address, 'a2')
 
+    def test_delete_db_deletes_an_existing_database(self):
+        self.db.create()
+        self.db.delete_db()
+        self.assertFalse(path.exists(testdb))
+
+    def test_delete_db_does_not_give_error_when_database_doesnt_exist(self):
+        self.assertFalse(path.exists(testdb))
+        try:
+            self.db.delete_db()
+        except Exception as e:
+            self.fail('Unexpected exception thrown by delete_db: %s' % e)
+
     # TODO: test init - need generator to generate emails
-    # TODO: test change_name
-    # TODO: test delete_db
     # TODO: test no name doesn't cause problems
 
 
