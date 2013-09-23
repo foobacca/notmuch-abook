@@ -104,6 +104,15 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         for address in three_address:
             yield address
 
+    def three_address_generator_with_duplicates(self):
+        three_address = [
+            ('a', 'a@a.com'),
+            ('b', 'b@b.com'),
+            ('c', 'a@a.com'),
+        ]
+        for address in three_address:
+            yield address
+
     def test_path_set_correctly(self):
         self.assertEqual(testdb, self.db._SQLiteStorage__path)
 
@@ -239,7 +248,18 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         except Exception as e:
             self.fail('Unexpected exception thrown by delete_db: %s' % e)
 
-    # TODO: test init - need generator to generate emails
+    def test_init_adds_all_addresses(self):
+        self.db.create()
+        self.db.init(self.three_address_generator)
+        self.assertNumEntries(3)
+
+    def test_init_doesnt_add_duplicate_addresses(self):
+        self.db.create()
+        self.db.init(self.three_address_generator_with_duplicates)
+        self.assertNumEntries(2)
+        # also check if only the first name was used
+        self.assertNameEquals(self.a_address, self.a_name)
+
     # TODO: test no name doesn't cause problems
 
 
