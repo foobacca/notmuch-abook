@@ -86,6 +86,11 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         self.do_update_a()
         self.do_update_b()
 
+    def create_with_name_order_different_to_address(self):
+        self.db.create()
+        self.db.update(('b', 'a@a.com'))
+        self.db.update(('a', 'b@b.com'))
+
     def create_with_a_b_and_long(self):
         self.create_with_a_and_b()
         self.do_update_long()
@@ -190,6 +195,42 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         self.create_with_a_and_b()
         self.db.delete_matches('a')
         self.assertNumEntries(1)
+
+    def test_delete_matches_doesnt_cause_error_on_no_matches(self):
+        self.create_with_a_and_b()
+        try:
+            self.db.delete_matches('z')
+            self.assertNumEntries(2)
+        except Exception as e:
+            self.fail('Unexpected exception thrown by delete_matches: %s' % e)
+
+    def test_fetchall_fetches_correct_number_of_results(self):
+        self.create_with_a_b_and_long()
+        self.assertNumEntries(len(list(self.db.fetchall('name'))))
+
+    def test_fetchall_orders_by_name(self):
+        self.create_with_name_order_different_to_address()
+        results = list(self.db.fetchall('name'))
+        self.assertEqual('a', results[0]['name'])
+        self.assertEqual('b', results[1]['name'])
+
+    def test_fetchall_orders_by_address(self):
+        self.create_with_name_order_different_to_address()
+        results = list(self.db.fetchall('address'))
+        self.assertEqual('a@a.com', results[0]['address'])
+        self.assertEqual('b@b.com', results[1]['address'])
+
+    def test_change_name_changes_name(self):
+        self.db.create()
+        self.do_update_a()
+        self.assertNameEquals(self.a_address, 'a')
+        self.db.change_name(self.a_address, 'a2')
+        self.assertNameEquals(self.a_address, 'a2')
+
+    # TODO: test init - need generator to generate emails
+    # TODO: test change_name
+    # TODO: test delete_db
+    # TODO: test no name doesn't cause problems
 
 
 class TestDocOpt(unittest.TestCase):
