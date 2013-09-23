@@ -251,7 +251,8 @@ class SQLiteStorage():
             with self.connect() as c:
                 cur = c.cursor()
                 if replace:
-                    present = cur.execute("SELECT 1 FROM AddressBook WHERE address = ?", [addr[1]])
+                    present_cursor = cur.execute("SELECT 1 FROM AddressBook WHERE address = ?", [addr[1]])
+                    present = present_cursor.fetchall()
                     if present:
                         cur.execute("UPDATE AddressBook SET name = ? WHERE address = ?", addr)
                     else:

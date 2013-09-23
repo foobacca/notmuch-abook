@@ -35,6 +35,13 @@ class TestNotmuchConfig(unittest.TestCase):
 
 
 class TestAbookDatabaseNoIgnore(unittest.TestCase):
+    a_name = 'a'
+    a_address = 'a@a.com'
+    a_record = (a_name, a_address)
+
+    long_name = 'name'
+    long_address = 'address@address.com'
+    long_record = (long_name, long_address)
 
     def setUp(self):
         self.config = abook.NotMuchConfig(test_config_noignore)
@@ -46,20 +53,51 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
 
     def assertNumEntries(self, expected_count):
         with self.db.connect() as c:
-            rows = c.execute('select count(*) from AddressBook')
+            rows = c.execute('SELECT COUNT(*) FROM AddressBook')
             result = rows.fetchall()
             actual_count = result[0][0]
             self.assertEqual(expected_count, actual_count)
+
+    def assertNameEquals(self, address, expected_name):
+        with self.db.connect() as c:
+            rows = c.execute('SELECT name FROM AddressBook WHERE address = ?', (address,))
+            result = rows.fetchall()
+            actual_name = result[0][0]
+            self.assertEqual(expected_name, actual_name)
 
     def createFakeDb(self):
         with open(testdb, 'w') as f:
             f.write('nonsense')
 
     def do_update_a(self):
-        self.db.update(('a', 'a@a.com'))
+        self.db.update(self.a_record)
+
+    def do_update_a2(self, replace=False):
+        self.db.update(('a2', self.a_address), replace)
 
     def do_update_b(self):
         self.db.update(('b', 'b@b.com'))
+
+    def do_update_long(self):
+        self.db.update(self.long_record)
+
+    def create_with_a_and_b(self):
+        self.db.create()
+        self.do_update_a()
+        self.do_update_b()
+
+    def create_with_a_b_and_long(self):
+        self.create_with_a_and_b()
+        self.do_update_long()
+
+    def three_address_generator(self):
+        three_address = [
+            ('a', 'a@a.com'),
+            ('b', 'b@b.com'),
+            ('c', 'c@c.com'),
+        ]
+        for address in three_address:
+            yield address
 
     def test_path_set_correctly(self):
         self.assertEqual(testdb, self.db._SQLiteStorage__path)
@@ -81,10 +119,14 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         except Exception as e:
             self.fail('Unexpected exception %s' % e)
 
-    def test_can_add_name_address_to_empty_db(self):
+    def test_db_empty_after_create(self):
+        # if this breaks, it will break many other tests
         self.db.create()
         # assert the database is empty
         self.assertNumEntries(0)
+
+    def test_can_add_name_address_to_empty_db(self):
+        self.db.create()
         self.do_update_a()
         self.assertNumEntries(1)
         self.do_update_b()
@@ -92,11 +134,61 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
 
     def test_duplicate_name_does_not_get_added(self):
         self.db.create()
-        # assert the database is empty
-        self.assertNumEntries(0)
         self.do_update_a()
         self.assertNumEntries(1)
         self.do_update_a()
+        self.assertNumEntries(1)
+        self.do_update_a2()
+        self.assertNumEntries(1)
+
+    def test_new_name_does_not_overwrite_old_name(self):
+        self.db.create()
+        self.do_update_a()
+        self.assertNumEntries(1)
+        self.do_update_a2()
+        self.assertNumEntries(1)
+        self.assertNameEquals(self.a_address, self.a_name)
+
+    def test_duplicate_name_can_replace(self):
+        self.db.create()
+        self.do_update_a()
+        self.assertNumEntries(1)
+        self.do_update_a2(replace=True)
+        self.assertNumEntries(1)
+        self.assertNameEquals(self.a_address, 'a2')
+
+    def test_replace_argument_works_when_not_replacing(self):
+        self.db.create()
+        self.do_update_a2(replace=True)
+        self.assertNumEntries(1)
+        self.assertNameEquals(self.a_address, 'a2')
+
+    def test_lookup_a_returns_one_correct_entry(self):
+        self.create_with_a_and_b()
+        results = list(self.db.lookup('a'))
+        self.assertEqual(1, len(results))
+        self.assertSequenceEqual(self.a_record, results[0])
+
+    def test_lookup_finds_match_only_in_name_field(self):
+        self.create_with_a_b_and_long()
+        results = list(self.db.lookup(self.long_name))
+        self.assertEqual(1, len(results))
+        self.assertSequenceEqual(self.long_record, results[0])
+
+    def test_lookup_finds_match_only_in_address_field(self):
+        self.create_with_a_b_and_long()
+        results = list(self.db.lookup(self.long_address))
+        self.assertEqual(1, len(results))
+        self.assertSequenceEqual(self.long_record, results[0])
+
+    def test_lookup_com_returns_two_entries(self):
+        self.create_with_a_and_b()
+        results = list(self.db.lookup('com'))
+        self.assertEqual(2, len(results))
+
+    def test_one_entry_left_after_delete_matches(self):
+        self.create_with_a_and_b()
+        self.db.delete_matches('a')
         self.assertNumEntries(1)
 
 
