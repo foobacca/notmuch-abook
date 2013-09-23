@@ -104,8 +104,13 @@ class NotMuchConfig(object):
 
 
 class Ignorer(object):
-    def __init__(self, config):
-        self.ignorefile = config.get('addressbook', 'ignorefile')
+    def __init__(self, ignorefile=None, config=None):
+        if ignorefile:
+            self.ignorefile = ignorefile
+        elif config:
+            self.ignorefile = config.get('addressbook', 'ignorefile')
+        else:
+            raise Exception('either ignorefile or config required to create Ignorer')
         self.ignore_regexes = None
         self.ignore_substrings = None
 
