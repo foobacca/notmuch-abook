@@ -208,7 +208,7 @@ class SQLiteStorage(object):
             raise IOError("Database '%s' does not exists" % (self.path,))
         return sqlite3.connect(self.path, isolation_level="DEFERRED")
 
-    def create(self):
+    def create(self, with_index=True):
         """
         create a new database
         """
@@ -220,15 +220,26 @@ class SQLiteStorage(object):
                 cur = c.cursor()
                 cur.execute("CREATE TABLE AddressBook ("
                             "  Name CHAR(256),"
-                            "  Address CHAR(256) UNIQUE NOT NULL,"
+                            "  Address CHAR(256) NOT NULL,"
                             "  Count INTEGER DEFAULT 1"
                             ")")
+            if with_index:
+                self.add_indexes_and_triggers()
 
-    def add_indexes(self):
+    def add_indexes_and_triggers(self):
         with sqlite3.connect(self.path) as c:
             cur = c.cursor()
             cur.execute("CREATE INDEX addressbook_name_idx ON AddressBook(Name)")
             cur.execute("CREATE INDEX addressbook_address_idx ON AddressBook(Address)")
+            # this trigger runs before the insert.  If there is a match (on
+            # address) then it will increment the matching row, and then the
+            # RAISE(IGNORE) will cause the INSERT itself to be abandoned.
+            cur.execute("CREATE TRIGGER inc_count BEFORE INSERT ON AddressBook "
+                        "BEGIN "
+                        "  UPDATE AddressBook SET count="
+                        "    (SELECT MAX(count)+1 FROM AddressBook WHERE Address=NEW.Address);"
+                        "  SELECT RAISE(IGNORE) FROM addressbook WHERE Address=NEW.Address;"
+                        "END;")
 
     def init(self, gen):
         """
@@ -254,7 +265,7 @@ class SQLiteStorage(object):
                             values_gen(address_dict))
             cur.commit()
 
-        self.add_indexes()
+        self.add_indexes_and_triggers()
         return n
 
     def update(self, addr, replace=False):
@@ -396,7 +407,7 @@ def import_address_list(db, replace_all, input_format, infile=None):
 
 
 def create_action(db, nm_config):
-    db.create()
+    db.create(with_index=False)
     nm_mailgetter = NotmuchAddressGetter(nm_config)
     n = db.init(nm_mailgetter.generate)
     print "added %d addresses" % n

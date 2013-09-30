@@ -256,12 +256,12 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
             self.fail('Unexpected exception thrown by delete_db: %s' % e)
 
     def test_init_adds_all_addresses(self):
-        self.db.create()
+        self.db.create(with_index=False)
         self.db.init(self.three_address_generator)
         self.assertNumEntries(3)
 
     def test_init_doesnt_add_duplicate_addresses(self):
-        self.db.create()
+        self.db.create(with_index=False)
         self.db.init(self.three_address_generator_with_duplicates)
         self.assertNumEntries(2)
         # also check if only the first name was used
