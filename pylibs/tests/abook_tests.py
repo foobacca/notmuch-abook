@@ -114,7 +114,7 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
             yield address
 
     def test_path_set_correctly(self):
-        self.assertEqual(testdb, self.db._SQLiteStorage__path)
+        self.assertEqual(testdb, self.db.path)
 
     def test_connect_raises_IOError_when_db_not_present(self):
         # this is checking our assumption
@@ -261,6 +261,14 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         self.assertNameEquals(self.a_address, self.a_name)
 
     # TODO: test no name doesn't cause problems
+
+
+class TestAbookDatabaseUniqueNoIgnore(TestAbookDatabaseNoIgnore):
+
+    # repeat all the tests with the new class
+    def setUp(self):
+        self.config = abook.NotMuchConfig(test_config_noignore)
+        self.db = abook.SQLiteStorageUnique(self.config)
 
 
 class TestDocOpt(unittest.TestCase):

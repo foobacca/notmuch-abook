@@ -192,29 +192,31 @@ class NotmuchAddressGetter(object):
 
 
 class SQLiteStorage(object):
+    INSERT_STMT = "INSERT INTO AddressBookView VALUES(?,?)"
+
     """SQL Storage backend"""
     def __init__(self, config):
-        self.__path = config.get("addressbook", "path")
-        self.ignorer = Ignorer(config)
+        self.path = config.get("addressbook", "path")
+        self.ignorer = Ignorer(config=config)
 
     def connect(self):
         """
         creates a new connection to the database and returns a cursor
         throws an error if the database does not exists
         """
-        if not os.path.exists(self.__path):
-            raise IOError("Database '%s' does not exists" % (self.__path,))
-        return sqlite3.connect(self.__path, isolation_level="DEFERRED")
+        if not os.path.exists(self.path):
+            raise IOError("Database '%s' does not exists" % (self.path,))
+        return sqlite3.connect(self.path, isolation_level="DEFERRED")
 
     def create(self):
         """
         create a new database
         """
-        if os.path.exists(self.__path):
+        if os.path.exists(self.path):
             raise IOError("Can't create database at '%s'. File exists." %
-                          (self.__path,))
+                          (self.path,))
         else:
-            with sqlite3.connect(self.__path) as c:
+            with sqlite3.connect(self.path) as c:
                 cur = c.cursor()
                 cur.execute("CREATE VIRTUAL TABLE AddressBook USING fts4(Name, Address)")
                 cur.execute("CREATE VIEW AddressBookView AS SELECT * FROM addressbook")
@@ -237,7 +239,7 @@ class SQLiteStorage(object):
             cur.execute("PRAGMA synchronous = OFF")
             for elt in gen():
                 try:
-                    cur.execute("INSERT INTO AddressBookView VALUES(?,?)", elt)
+                    cur.execute(self.INSERT_STMT, elt)
                     n += 1
                 except sqlite3.IntegrityError:
                     pass
@@ -261,9 +263,9 @@ class SQLiteStorage(object):
                     if present:
                         cur.execute("UPDATE AddressBook SET name = ? WHERE address = ?", addr)
                     else:
-                        cur.execute("INSERT INTO AddressBookView VALUES(?,?)", addr)
+                        cur.execute(self.INSERT_STMT, addr)
                 else:
-                    cur.execute("INSERT INTO AddressBookView VALUES(?,?)", addr)
+                    cur.execute(self.INSERT_STMT, addr)
                 return True
         except sqlite3.IntegrityError:
             return False
@@ -279,7 +281,7 @@ class SQLiteStorage(object):
             # so we can access results via dictionary
             c.row_factory = sqlite3.Row
             cur = c.cursor()
-            for res in cur.execute(self.create_query("SELECT *", pattern)).fetchall():
+            for res in cur.execute(self.create_query("SELECT Name,Address", pattern)).fetchall():
                 yield res
 
     def delete_matches(self, pattern):
@@ -313,8 +315,35 @@ class SQLiteStorage(object):
         """
         Delete the database
         """
-        if os.path.exists(self.__path):
-            os.remove(self.__path)
+        if os.path.exists(self.path):
+            os.remove(self.path)
+
+
+class SQLiteStorageUnique(SQLiteStorage):
+    """ Try using a normal column with a unique attribute """
+    INSERT_STMT = "INSERT INTO AddressBook (Name,Address) VALUES(?,?)"
+
+    def create(self):
+        """
+        create a new database
+        """
+        if os.path.exists(self.path):
+            raise IOError("Can't create database at '%s'. File exists." %
+                          (self.path,))
+        else:
+            with sqlite3.connect(self.path) as c:
+                cur = c.cursor()
+                cur.execute("CREATE TABLE AddressBook ("
+                            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                            "  Name CHAR(256),"
+                            "  Address CHAR(256) UNIQUE NOT NULL"
+                            ")")
+                cur.execute("CREATE INDEX addressbook_name_idx ON AddressBook(Name)")
+                cur.execute("CREATE INDEX addressbook_address_idx ON AddressBook(Address)")
+
+    def create_query(self, query_start, pattern):
+        return query_start + \
+            """ FROM AddressBook WHERE Name LIKE '%%%s%%' OR Address LIKE '%%%s%%' """ % (pattern, pattern)
 
 
 def format_address(address, output_format):
@@ -451,8 +480,11 @@ def run():
 
     try:
         nm_config = NotMuchConfig(options['--config'])
-        if nm_config.get("addressbook", "backend") == "sqlite3":
+        backend = nm_config.get("addressbook", "backend")
+        if backend == "sqlite3":
             db = SQLiteStorage(nm_config)
+        elif backend == "sqlite3unique":
+            db = SQLiteStorageUnique(nm_config)
         else:
             print "Database backend '%s' is not implemented." % \
                 nm_config.get("addressbook", "backend")
