@@ -219,7 +219,6 @@ class SQLiteStorage(object):
             with sqlite3.connect(self.path) as c:
                 cur = c.cursor()
                 cur.execute("CREATE TABLE AddressBook ("
-                            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
                             "  Name CHAR(256),"
                             "  Address CHAR(256) UNIQUE NOT NULL,"
                             "  Count INTEGER DEFAULT 1"
@@ -239,16 +238,20 @@ class SQLiteStorage(object):
         address_dict = {}
         for name, address in gen():
             if address in address_dict:
-                address_dict[address]['count'] = address_dict[address]['count'] + 1
+                address_dict[address]['count'] += 1
             else:
                 address_dict[address] = {'name': name, 'count': 1}
                 n += 1
 
+        def values_gen(d):
+            for address, attr in d.iteritems():
+                yield attr['name'], address, attr['count']
+
         with self.connect() as cur:
             cur.execute("PRAGMA synchronous = OFF")
             cur.execute("PRAGMA journal_mode = MEMORY")
-            for address, attr in address_dict.iteritems():
-                cur.execute(self.INSERT_STMT, (attr['name'], address))
+            cur.executemany("INSERT INTO AddressBook VALUES(?,?,?)",
+                            values_gen(address_dict))
             cur.commit()
 
         self.add_indexes()
