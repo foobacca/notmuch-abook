@@ -191,7 +191,7 @@ class NotmuchAddressGetter(object):
                 yield addr
 
 
-class SQLiteStorage():
+class SQLiteStorage(object):
     """SQL Storage backend"""
     def __init__(self, config):
         self.__path = config.get("addressbook", "path")
