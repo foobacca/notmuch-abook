@@ -192,7 +192,7 @@ class NotmuchAddressGetter(object):
 
 
 class SQLiteStorage(object):
-    INSERT_STMT = "INSERT INTO AddressBookView VALUES(?,?)"
+    INSERT_STMT = "INSERT INTO AddressBook (Name,Address) VALUES(?,?)"
 
     """SQL Storage backend"""
     def __init__(self, config):
@@ -218,23 +218,18 @@ class SQLiteStorage(object):
         else:
             with sqlite3.connect(self.path) as c:
                 cur = c.cursor()
-                cur.execute("CREATE VIRTUAL TABLE AddressBook USING fts4(Name, Address)")
-                cur.execute("CREATE VIEW AddressBookView AS SELECT * FROM addressbook")
-                cur.executescript(
-                    "CREATE TRIGGER insert_into_ab " +
-                    "INSTEAD OF INSERT ON AddressBookView " +
-                    "BEGIN" +
-                    " SELECT RAISE(ABORT, 'column name is not unique')" +
-                    "   FROM addressbook" +
-                    "  WHERE address = new.address;" +
-                    " INSERT INTO addressbook VALUES(new.name, new.address);" +
-                    "END;")
-        # not sure how to add count.  There is
-        # http://stackoverflow.com/questions/6686479/using-sqlite-fts3-with-integer-columns
-        # but looks complicated
+                cur.execute("CREATE TABLE AddressBook ("
+                            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                            "  Name CHAR(256),"
+                            "  Address CHAR(256) UNIQUE NOT NULL,"
+                            "  Count INTEGER DEFAULT 1"
+                            ")")
 
     def add_indexes(self):
-        pass
+        with sqlite3.connect(self.path) as c:
+            cur = c.cursor()
+            cur.execute("CREATE INDEX addressbook_name_idx ON AddressBook(Name)")
+            cur.execute("CREATE INDEX addressbook_address_idx ON AddressBook(Address)")
 
     def init(self, gen):
         """
@@ -284,7 +279,8 @@ class SQLiteStorage(object):
             return False
 
     def create_query(self, query_start, pattern):
-        return query_start + """ FROM AddressBook WHERE AddressBook MATCH '"%s*"'""" % pattern
+        return query_start + \
+            """ FROM AddressBook WHERE Name LIKE '%%%s%%' OR Address LIKE '%%%s%%' """ % (pattern, pattern)
 
     def lookup(self, pattern):
         """
@@ -330,38 +326,6 @@ class SQLiteStorage(object):
         """
         if os.path.exists(self.path):
             os.remove(self.path)
-
-
-class SQLiteStorageUnique(SQLiteStorage):
-    """ Try using a normal column with a unique attribute """
-    INSERT_STMT = "INSERT INTO AddressBook (Name,Address) VALUES(?,?)"
-
-    def create(self):
-        """
-        create a new database
-        """
-        if os.path.exists(self.path):
-            raise IOError("Can't create database at '%s'. File exists." %
-                          (self.path,))
-        else:
-            with sqlite3.connect(self.path) as c:
-                cur = c.cursor()
-                cur.execute("CREATE TABLE AddressBook ("
-                            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                            "  Name CHAR(256),"
-                            "  Address CHAR(256) UNIQUE NOT NULL,"
-                            "  Count INTEGER DEFAULT 1"
-                            ")")
-
-    def add_indexes(self):
-        with sqlite3.connect(self.path) as c:
-            cur = c.cursor()
-            cur.execute("CREATE INDEX addressbook_name_idx ON AddressBook(Name)")
-            cur.execute("CREATE INDEX addressbook_address_idx ON AddressBook(Address)")
-
-    def create_query(self, query_start, pattern):
-        return query_start + \
-            """ FROM AddressBook WHERE Name LIKE '%%%s%%' OR Address LIKE '%%%s%%' """ % (pattern, pattern)
 
 
 def format_address(address, output_format):
@@ -501,8 +465,6 @@ def run():
         backend = nm_config.get("addressbook", "backend")
         if backend == "sqlite3":
             db = SQLiteStorage(nm_config)
-        elif backend == "sqlite3unique":
-            db = SQLiteStorageUnique(nm_config)
         else:
             print "Database backend '%s' is not implemented." % \
                 nm_config.get("addressbook", "backend")

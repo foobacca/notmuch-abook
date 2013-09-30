@@ -65,6 +65,13 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
             actual_name = result[0][0]
             self.assertEqual(expected_name, actual_name)
 
+    def assertCountEquals(self, address, expected_count):
+        with self.db.connect() as c:
+            rows = c.execute('SELECT count FROM AddressBook WHERE address = ?', (address,))
+            result = rows.fetchall()
+            actual_count = result[0][0]
+            self.assertEqual(expected_count, actual_count)
+
     def createFakeDb(self):
         with open(testdb, 'w') as f:
             f.write('nonsense')
@@ -260,23 +267,6 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         # also check if only the first name was used
         self.assertNameEquals(self.a_address, self.a_name)
 
-    # TODO: test no name doesn't cause problems
-
-
-class TestAbookDatabaseUniqueNoIgnore(TestAbookDatabaseNoIgnore):
-
-    # repeat all the tests with the new class
-    def setUp(self):
-        self.config = abook.NotMuchConfig(test_config_noignore)
-        self.db = abook.SQLiteStorageUnique(self.config)
-
-    def assertCountEquals(self, address, expected_count):
-        with self.db.connect() as c:
-            rows = c.execute('SELECT count FROM AddressBook WHERE address = ?', (address,))
-            result = rows.fetchall()
-            actual_count = result[0][0]
-            self.assertEqual(expected_count, actual_count)
-
     def test_count_is_1_after_name_address_to_empty_db(self):
         self.db.create()
         self.do_update_a()
@@ -296,6 +286,8 @@ class TestAbookDatabaseUniqueNoIgnore(TestAbookDatabaseNoIgnore):
         self.do_update_a2()
         self.assertNumEntries(1)
         self.assertCountEquals(self.a_address, 2)
+
+    # TODO: test no name doesn't cause problems
 
 
 class TestDocOpt(unittest.TestCase):
