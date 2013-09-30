@@ -229,21 +229,34 @@ class SQLiteStorage(object):
                     "  WHERE address = new.address;" +
                     " INSERT INTO addressbook VALUES(new.name, new.address);" +
                     "END;")
+        # not sure how to add count.  There is
+        # http://stackoverflow.com/questions/6686479/using-sqlite-fts3-with-integer-columns
+        # but looks complicated
+
+    def add_indexes(self):
+        pass
 
     def init(self, gen):
         """
         populates the database with all addresses from address book
         """
         n = 0
+        address_dict = {}
+        for name, address in gen():
+            if address in address_dict:
+                address_dict[address]['count'] = address_dict[address]['count'] + 1
+            else:
+                address_dict[address] = {'name': name, 'count': 1}
+                n += 1
+
         with self.connect() as cur:
             cur.execute("PRAGMA synchronous = OFF")
-            for elt in gen():
-                try:
-                    cur.execute(self.INSERT_STMT, elt)
-                    n += 1
-                except sqlite3.IntegrityError:
-                    pass
+            cur.execute("PRAGMA journal_mode = MEMORY")
+            for address, attr in address_dict.iteritems():
+                cur.execute(self.INSERT_STMT, (attr['name'], address))
             cur.commit()
+
+        self.add_indexes()
         return n
 
     def update(self, addr, replace=False):
@@ -336,10 +349,15 @@ class SQLiteStorageUnique(SQLiteStorage):
                 cur.execute("CREATE TABLE AddressBook ("
                             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
                             "  Name CHAR(256),"
-                            "  Address CHAR(256) UNIQUE NOT NULL"
+                            "  Address CHAR(256) UNIQUE NOT NULL,"
+                            "  Count INTEGER DEFAULT 1"
                             ")")
-                cur.execute("CREATE INDEX addressbook_name_idx ON AddressBook(Name)")
-                cur.execute("CREATE INDEX addressbook_address_idx ON AddressBook(Address)")
+
+    def add_indexes(self):
+        with sqlite3.connect(self.path) as c:
+            cur = c.cursor()
+            cur.execute("CREATE INDEX addressbook_name_idx ON AddressBook(Name)")
+            cur.execute("CREATE INDEX addressbook_address_idx ON AddressBook(Address)")
 
     def create_query(self, query_start, pattern):
         return query_start + \

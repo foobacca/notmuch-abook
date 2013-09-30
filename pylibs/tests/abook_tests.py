@@ -270,6 +270,33 @@ class TestAbookDatabaseUniqueNoIgnore(TestAbookDatabaseNoIgnore):
         self.config = abook.NotMuchConfig(test_config_noignore)
         self.db = abook.SQLiteStorageUnique(self.config)
 
+    def assertCountEquals(self, address, expected_count):
+        with self.db.connect() as c:
+            rows = c.execute('SELECT count FROM AddressBook WHERE address = ?', (address,))
+            result = rows.fetchall()
+            actual_count = result[0][0]
+            self.assertEqual(expected_count, actual_count)
+
+    def test_count_is_1_after_name_address_to_empty_db(self):
+        self.db.create()
+        self.do_update_a()
+        self.assertNumEntries(1)
+        self.assertCountEquals(self.a_address, 1)
+
+    def test_duplicate_name_and_address_causes_count_to_be_incremented(self):
+        self.db.create()
+        self.do_update_a()
+        self.do_update_a()
+        self.assertNumEntries(1)
+        self.assertCountEquals(self.a_address, 2)
+
+    def test_duplicate_address_with_different_name_causes_count_to_be_incremented(self):
+        self.db.create()
+        self.do_update_a()
+        self.do_update_a2()
+        self.assertNumEntries(1)
+        self.assertCountEquals(self.a_address, 2)
+
 
 class TestDocOpt(unittest.TestCase):
 
