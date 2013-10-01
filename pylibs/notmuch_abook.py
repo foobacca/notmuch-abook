@@ -143,8 +143,6 @@ class Ignorer(object):
 
 
 class MailParser(object):
-    def __init__(self):
-        self.addresses = dict()
 
     def parse_mail(self, m):
         """
@@ -163,9 +161,7 @@ class MailParser(object):
         for addr in email.utils.getaddresses(addrs):
             name = addr[0].strip('; ')
             address = addr[1].lower().strip(';\'" ')
-            if (address and address not in self.addresses):
-                self.addresses[address] = name
-                yield (name, address)
+            yield (name, address)
 
 
 class NotmuchAddressGetter(object):
