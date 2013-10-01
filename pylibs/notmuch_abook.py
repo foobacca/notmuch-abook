@@ -237,7 +237,8 @@ class SQLiteStorage(object):
             cur.execute("CREATE TRIGGER inc_count BEFORE INSERT ON AddressBook "
                         "BEGIN "
                         "  UPDATE AddressBook SET count="
-                        "    (SELECT MAX(count)+1 FROM AddressBook WHERE Address=NEW.Address);"
+                        "    (SELECT MAX(count)+1 FROM AddressBook WHERE Address=NEW.Address)"
+                        "    WHERE Address=NEW.Address;"
                         "  SELECT RAISE(IGNORE) FROM addressbook WHERE Address=NEW.Address;"
                         "END;")
 
