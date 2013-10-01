@@ -253,6 +253,8 @@ class SQLiteStorage(object):
 
         def values_gen(d):
             for address, attr in d.iteritems():
+                if self.ignorer.ignore_address(address):
+                    continue
                 yield attr['name'], address, attr['count']
 
         with self.connect() as cur:
