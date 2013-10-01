@@ -287,6 +287,25 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
         self.assertNumEntries(1)
         self.assertCountEquals(self.a_address, 2)
 
+    def test_duplicate_address_and_single_address_give_correct_counts(self):
+        self.db.create()
+        self.do_update_a()
+        self.do_update_b()
+        self.do_update_b()
+        self.assertNumEntries(2)
+        self.assertCountEquals(self.a_address, 1)
+        self.assertCountEquals('b@b.com', 2)
+
+    def test_highest_count_comes_first_in_lookup(self):
+        self.db.create()
+        self.do_update_a()
+        self.do_update_b()
+        self.do_update_b()
+        results = list(self.db.lookup('com'))
+        self.assertEqual(2, len(results))
+        self.assertSequenceEqual(('b', 'b@b.com'), results[0])
+        self.assertSequenceEqual(self.a_record, results[1])
+
     # TODO: test no name doesn't cause problems
 
 

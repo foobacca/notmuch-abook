@@ -305,7 +305,8 @@ class SQLiteStorage(object):
             # so we can access results via dictionary
             c.row_factory = sqlite3.Row
             cur = c.cursor()
-            for res in cur.execute(self.create_query("SELECT Name,Address", pattern)).fetchall():
+            query = self.create_query("SELECT Name,Address", pattern) + "ORDER BY Count DESC"
+            for res in cur.execute(query).fetchall():
                 yield res
 
     def delete_matches(self, pattern):
