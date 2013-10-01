@@ -16,6 +16,72 @@ sys.path.append(abook_dir)
 import notmuch_abook as abook
 
 
+class TestFormatAndDecode(unittest.TestCase):
+    """ only test functions with no side effects here """
+    name = 'name'
+    email = 'a@b.org'
+    address = {'Name': name, 'Address': email}
+
+    def test_format_address_abook(self):
+        self.assertEqual('a@b.org\tname',
+                         abook.format_address(self.address, 'abook'))
+
+    def test_format_address_email(self):
+        self.assertEqual('name <a@b.org>',
+                         abook.format_address(self.address, 'email'))
+
+    def test_format_address_unknown_format_raises_exception(self):
+        self.assertRaises(abook.InvalidOptionError, abook.format_address,
+                          self.address, 'unknown')
+
+    def test_decode_line_abook_with_tab(self):
+        line = '%s\t%s' % (self.email, self.name)
+        name, email = abook.decode_line(line, 'abook')
+        self.assertEqual(self.name, name)
+        self.assertEqual(self.email, email)
+
+    def test_decode_line_abook_without_tab(self):
+        name, email = abook.decode_line(self.email, 'abook')
+        self.assertEqual('', name)
+        self.assertEqual(self.email, email)
+
+    def test_decode_line_email_plain_name(self):
+        line = '%s <%s>' % (self.name, self.email)
+        name, email = abook.decode_line(line, 'email')
+        self.assertEqual(self.name, name)
+        self.assertEqual(self.email, email)
+
+    def test_decode_line_email_quoted_name(self):
+        line = '"%s" <%s>' % (self.name, self.email)
+        name, email = abook.decode_line(line, 'email')
+        self.assertEqual(self.name, name)
+        self.assertEqual(self.email, email)
+
+    def test_decode_line_email_no_name_email_in_brackets(self):
+        line = '<%s>' % self.email
+        name, email = abook.decode_line(line, 'email')
+        self.assertEqual('', name)
+        self.assertEqual(self.email, email)
+
+    def test_decode_line_email_no_name_plain_email(self):
+        name, email = abook.decode_line(self.email, 'email')
+        self.assertEqual('', name)
+        self.assertEqual(self.email, email)
+
+    def test_decode_line_unknown_format_raises_exception(self):
+        self.assertRaises(abook.InvalidOptionError, abook.decode_line,
+                          self.email, 'unknown')
+
+
+class TestDocOpt(unittest.TestCase):
+
+    def test_docopt_parses_doc_string(self):
+        # if the docopt string is badly formatted, we'll get an exception
+        # thrown here
+        options = docopt.docopt(abook.__doc__, argv=['--help'], help=False)
+        self.assertTrue(options['--help'])
+
+
 class TestNotmuchConfig(unittest.TestCase):
 
     # these two tests also confirm that our global variables have the correct
@@ -308,11 +374,4 @@ class TestAbookDatabaseNoIgnore(unittest.TestCase):
 
     # TODO: test no name doesn't cause problems
 
-
-class TestDocOpt(unittest.TestCase):
-
-    def test_docopt_parses_doc_string(self):
-        # if the docopt string is badly formatted, we'll get an exception
-        # thrown here
-        options = docopt.docopt(abook.__doc__, argv=['--help'], help=False)
-        self.assertTrue(options['--help'])
+# TODO: test ignorer
