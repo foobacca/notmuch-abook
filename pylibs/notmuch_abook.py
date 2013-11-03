@@ -371,7 +371,7 @@ def print_address_list(address_list, output_format, out=None):
         try:
             writer = csv.writer(out)
             for address in address_list:
-                writer.writerow((address['Name'], address['Address']))
+                writer.writerow((address['Name'], address['Address'], address['Count']))
         except UnicodeEncodeError as e:
             print >> sys.stderr, "Caught UnicodeEncodeError: %s" % e
             print >> sys.stderr, "Installing unicodecsv will probably fix this"
